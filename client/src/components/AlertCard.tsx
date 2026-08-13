@@ -1,6 +1,6 @@
 import React from 'react';
 import { TriggeredAlert } from '../types';
-import { Volume2, ExternalLink, MapPin, AlertTriangle, Calendar, BookOpen, Clock } from 'lucide-react';
+import { Volume2, ExternalLink, MapPin, AlertTriangle, Calendar, BookOpen, Clock, Newspaper, MessageSquare } from 'lucide-react';
 import { speakText } from '../services/ttsService';
 import { formatDistance } from '../utils/distance';
 
@@ -14,6 +14,18 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, voiceSpeed = 'norma
 
   const getCategoryConfig = (category: string) => {
     switch (category) {
+      case 'news':
+        return {
+          label: 'Live News & Updates',
+          bg: 'bg-blue-950/70 border-blue-500/40 text-blue-300',
+          icon: <Newspaper className="w-4 h-4 text-blue-400" />,
+        };
+      case 'social':
+        return {
+          label: 'Community Buzz & Insider Tips',
+          bg: 'bg-orange-950/70 border-orange-500/40 text-orange-300',
+          icon: <MessageSquare className="w-4 h-4 text-orange-400" />,
+        };
       case 'historic':
         return {
           label: 'Historic Landmark',
@@ -61,6 +73,11 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, voiceSpeed = 'norma
         <div className="flex items-center gap-2">
           {config.icon}
           <span className="text-xs font-semibold uppercase tracking-wider">{config.label}</span>
+          {poi.sourceProvider && (
+            <span className="px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700/50 text-[10px] font-mono text-slate-300">
+              {poi.sourceProvider}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-400">
           <span className="flex items-center gap-1 font-mono">
@@ -95,7 +112,7 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, voiceSpeed = 'norma
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/30 transition-colors active:scale-95 min-h-[44px]"
           >
-            <span>Open Link</span>
+            <span>Read Article</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { AppSettings } from '../types';
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -8,6 +8,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     hazards: true,
     podcasts: true,
     hiddenGems: true,
+    news: true,
+    social: true,
   },
   voice: {
     enabled: true,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Bell, Volume2, Navigation, Sun, Moon, Monitor, Sliders } from 'lucide-react';
+import { X, Bell, Volume2, Navigation, Sliders } from 'lucide-react';
 import { AppSettings, POICategory } from '../types';
 
 interface SettingsPanelProps {
@@ -28,7 +28,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   const categories: { key: POICategory; label: string; icon: string; desc: string }[] = [
-    { key: 'historic', label: 'Historic Landmarks', icon: '🏰', desc: 'Battlefields, heritage sites & historical monuments' },
+    { key: 'historic', label: 'Historic Landmarks', icon: '🏰', desc: 'Battlefields, heritage sites & historical monuments (Wikipedia)' },
+    { key: 'news', label: 'Live News & Local Updates', icon: '📰', desc: 'Breaking news stories, local events & regional updates' },
+    { key: 'social', label: 'Community Buzz & Insider Tips', icon: '💬', desc: 'Reddit discussions, viral food spots & local traveler tips' },
     { key: 'markets', label: 'Pop-Up Markets & Events', icon: '🎪', desc: 'Farmers markets, local fairs & pop-up events' },
     { key: 'hazards', label: 'Road Hazards', icon: '⚠️', desc: 'Known hazard zones, fog areas & traffic advisories' },
     { key: 'podcasts', label: 'Podcasts & Deep Reads', icon: '🎙️', desc: 'Curated audio stories and deep-dive links' },
@@ -36,7 +38,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm animate-fade-in select-none">
       <div className="w-full max-w-md bg-slate-900 border-l border-slate-800 h-full flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/80">
@@ -58,7 +60,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <section className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
               <Bell className="w-4 h-4 text-cyan-400" />
-              <span>Location Intelligence Filters</span>
+              <span>Multi-Source Intelligence Filters</span>
             </div>
             <div className="space-y-2">
               {categories.map((cat) => {
@@ -104,7 +106,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-slate-100">Spoken Voice Callouts</div>
-                  <div className="text-xs text-slate-400">Read POI stories over car speakers</div>
+                  <div className="text-xs text-slate-400">Read POI stories & news over car speakers</div>
                 </div>
                 <input
                   type="checkbox"
