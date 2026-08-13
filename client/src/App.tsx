@@ -146,8 +146,9 @@ export function App() {
   );
 
   // GEOFENCING + LOOKAHEAD LOGIC: Check proximity and 2-minute ETA to POIs on position update
+  // currentSimSpeed: the simulation multiplier (1/5/20). For GPS mode pass 1.
   const checkGeofence = useCallback(
-    (currentPos: [number, number], currentSpeedKmh: number, currentPolyIdx: number) => {
+    (currentPos: [number, number], currentSpeedKmh: number, currentPolyIdx: number, currentSimSpeed: number) => {
       if (!activeRoute.pois || activeRoute.pois.length === 0) return;
 
       let nearestUpcoming: { poi: POI; etaSeconds: number; distMeters: number } | null = null;
@@ -173,6 +174,11 @@ export function App() {
 
           setTriggeredAlerts((prev) => [alertObj, ...prev]);
 
+          // Auto-slow simulation to 1× so user can read/listen
+          if (trackingMode === 'simulating' && currentSimSpeed > 1) {
+            setSimSpeed(1);
+          }
+
           // Trigger Text-to-Speech voice alert if enabled
           if (settings.voice.enabled) {
             speakText(`Arriving now. ${poi.title}. ${poi.summary}`, settings.voice.speed);
@@ -190,14 +196,16 @@ export function App() {
           const alongDist = getDistanceAlongPolylineToPoi(currentPolyIdx, poi);
           if (alongDist !== null && alongDist > 0) {
             const speedMs = (currentSpeedKmh * 1000) / 3600;
-            const etaSeconds = alongDist / speedMs;
+            // In simulation, real wall-clock ETA = road ETA / simSpeed
+            const roadEtaSeconds = alongDist / speedMs;
+            const etaSeconds = trackingMode === 'simulating' ? roadEtaSeconds / currentSimSpeed : roadEtaSeconds;
 
             // Track nearest upcoming for HUD
             if (!nearestUpcoming || etaSeconds < nearestUpcoming.etaSeconds) {
               nearestUpcoming = { poi, etaSeconds, distMeters: alongDist };
             }
 
-            // Trigger pre-announcement when ETA is ~2 minutes (120s) or less
+            // Trigger pre-announcement when wall-clock ETA is ~2 minutes (120s) or less
             if (etaSeconds <= 120 && etaSeconds > 0) {
               preAnnouncedPoiIdsRef.current.add(poi.id);
 
@@ -208,6 +216,11 @@ export function App() {
               };
 
               setTriggeredAlerts((prev) => [alertObj, ...prev]);
+
+              // Auto-slow simulation to 1× so user can read/listen
+              if (trackingMode === 'simulating' && currentSimSpeed > 1) {
+                setSimSpeed(1);
+              }
 
               // Voice pre-announcement
               if (settings.voice.enabled) {
@@ -227,7 +240,8 @@ export function App() {
           const alongDist = getDistanceAlongPolylineToPoi(currentPolyIdx, poi);
           if (alongDist !== null && alongDist > 0) {
             const speedMs = (currentSpeedKmh * 1000) / 3600;
-            const etaSeconds = alongDist / speedMs;
+            const roadEtaHud = alongDist / speedMs;
+            const etaSeconds = trackingMode === 'simulating' ? roadEtaHud / currentSimSpeed : roadEtaHud;
             if (!nearestUpcoming || etaSeconds < nearestUpcoming.etaSeconds) {
               nearestUpcoming = { poi, etaSeconds, distMeters: alongDist };
             }
@@ -272,7 +286,8 @@ export function App() {
         setCarPosition(nextPos);
 
         // Geofence + lookahead check with speed and index
-        checkGeofence(nextPos, effectiveSpeed, nextIdx);
+        // Pass simSpeed so ETA and auto-slow work correctly
+        checkGeofence(nextPos, effectiveSpeed, nextIdx, simSpeed);
 
         return nextIdx;
       });
@@ -317,7 +332,7 @@ export function App() {
             }
           }
 
-          checkGeofence(newPos, speedKmh, closestIdx);
+          checkGeofence(newPos, speedKmh, closestIdx, 1); // GPS mode: no time acceleration
         },
         (err) => {
           console.error('GPS error:', err);
@@ -359,7 +374,7 @@ export function App() {
     setSimIndex(targetIdx);
     const newPos = activeRoute.polyline[targetIdx];
     setCarPosition(newPos);
-    checkGeofence(newPos, carSpeedKmh, targetIdx);
+    checkGeofence(newPos, carSpeedKmh, targetIdx, simSpeed);
   };
 
   const progressPercent =
