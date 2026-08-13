@@ -1,5 +1,15 @@
-import { POI, POICategory, RouteData } from '../types';
-import { getHaversineDistanceMeters } from '../utils/distance';
+export interface POI {
+  id: string;
+  name: string;
+  category: 'historic' | 'markets' | 'hazards' | 'podcasts' | 'hiddenGems';
+  title: string;
+  summary: string;
+  detail: string;
+  latLng: [number, number];
+  icon: string;
+  externalUrl?: string;
+  distanceFromStartKm?: number;
+}
 
 interface WikiGeosearchItem {
   pageid: number;
@@ -9,7 +19,38 @@ interface WikiGeosearchItem {
   dist: number;
 }
 
-function categorizeWikiItem(title: string, extract: string, description: string): { category: POICategory; icon: string } {
+interface WikiSummaryResponse {
+  pageid?: number;
+  title: string;
+  description?: string;
+  extract?: string;
+  coordinates?: {
+    lat: number;
+    lon: number;
+  };
+  content_urls?: {
+    desktop?: {
+      page?: string;
+    };
+  };
+}
+
+function getHaversineDistanceMeters(point1: [number, number], point2: [number, number]): number {
+  const R = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(point2[0] - point1[0]);
+  const dLng = toRad(point2[1] - point1[1]);
+  const lat1 = toRad(point1[0]);
+  const lat2 = toRad(point2[0]);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function categorizeWikiItem(title: string, extract: string, description: string): { category: POI['category']; icon: string } {
   const text = `${title} ${description} ${extract}`.toLowerCase();
 
   if (text.match(/park|castle|fort|battle|ancient|church|monastery|temple|monument|museum|ruin|tomb|roman|crusader|historic|heritage|memorial/)) {
@@ -29,21 +70,21 @@ function categorizeWikiItem(title: string, extract: string, description: string)
 }
 
 /**
- * Browser-Safe Real-World Dynamic POI Engine
- * Uses Wikipedia Action API with origin=* and Nominatim Reverse Geocoding for browser CORS compatibility.
+ * Server-side Wikipedia & Nominatim POI Generator
+ * Discovers real-world historical landmarks, town names, and lead extracts for any route.
  */
-export async function generatePoisForRouteAsync(route: RouteData): Promise<POI[]> {
-  if (route.pois && route.pois.length > 0) {
-    return route.pois;
-  }
-
-  const poly = route.polyline;
-  if (!poly || poly.length < 2) return [];
+export async function generatePoisForRouteAsyncServer(
+  origin: string,
+  destination: string,
+  polyline: [number, number][],
+  totalDistanceKm: number
+): Promise<POI[]> {
+  if (!polyline || polyline.length < 2) return [];
 
   // Calculate cumulative distances along polyline
   const cumDistMeters: number[] = [0];
-  for (let i = 1; i < poly.length; i++) {
-    const seg = getHaversineDistanceMeters(poly[i - 1], poly[i]);
+  for (let i = 1; i < polyline.length; i++) {
+    const seg = getHaversineDistanceMeters(polyline[i - 1], polyline[i]);
     cumDistMeters.push(cumDistMeters[i - 1] + seg);
   }
 
@@ -61,23 +102,21 @@ export async function generatePoisForRouteAsync(route: RouteData): Promise<POI[]
       idx++;
     }
     sampledCoords.push({
-      coord: poly[idx],
+      coord: polyline[idx],
       distKm: Math.round(cumDistMeters[idx] / 1000),
     });
   }
 
+  const headers = { 'User-Agent': 'RoadPulse-App/1.0 (contact@roadpulse.app)' };
   const pois: POI[] = [];
   const seenTitles = new Set<string>();
-
-  const originName = route.origin || 'Origin';
-  const destName = route.destination || 'Destination';
 
   const wikiPromises = sampledCoords.map(async (sample, i) => {
     const [lat, lon] = sample.coord;
     try {
-      // 1. Query Wikipedia Geosearch (with origin=* for browser CORS)
-      const geoUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=5000&gslimit=5&format=json&origin=*`;
-      const geoRes = await fetch(geoUrl);
+      // 1. Query Wikipedia Geosearch
+      const geoUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=5000&gslimit=5&format=json`;
+      const geoRes = await fetch(geoUrl, { headers });
       if (geoRes.ok) {
         const geoData = await geoRes.json();
         const items: WikiGeosearchItem[] = geoData.query?.geosearch || [];
@@ -86,38 +125,35 @@ export async function generatePoisForRouteAsync(route: RouteData): Promise<POI[]
         if (selectedItem) {
           seenTitles.add(selectedItem.title.toLowerCase());
 
-          // Fetch Action API page extract & coordinates (with origin=* for browser CORS)
-          const sumUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts|coordinates&exintro=1&explaintext=1&titles=${encodeURIComponent(selectedItem.title)}&format=json&origin=*`;
-          const sumRes = await fetch(sumUrl);
+          // Fetch Wikipedia summary
+          const sumUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(selectedItem.title)}`;
+          const sumRes = await fetch(sumUrl, { headers });
           if (sumRes.ok) {
-            const sumData = await sumRes.json();
-            const pages = sumData.query?.pages || {};
-            const pageId = Object.keys(pages)[0];
-            const page = pages[pageId];
+            const summary: WikiSummaryResponse = await sumRes.json();
+            if (summary.extract && summary.extract.length >= 20) {
+              const { category, icon } = categorizeWikiItem(
+                summary.title,
+                summary.extract,
+                summary.description || ''
+              );
 
-            if (page && page.extract && page.extract.length >= 20) {
-              const extractText: string = page.extract;
-              const titleClean: string = page.title;
-              const coordData = page.coordinates?.[0];
-
-              const { category, icon } = categorizeWikiItem(titleClean, extractText, '');
-
-              const poiLatLng: [number, number] = coordData
-                ? [coordData.lat, coordData.lon]
+              const poiLatLng: [number, number] = summary.coordinates
+                ? [summary.coordinates.lat, summary.coordinates.lon]
                 : sample.coord;
 
-              const subtitle = `${sample.distKm} km from ${originName}`;
+              const titleClean = summary.title;
+              const subtitle = summary.description ? summary.description : `${sample.distKm} km from ${origin}`;
 
               return {
-                id: `wiki-${pageId || i}-${Date.now()}`,
+                id: `wiki-${summary.pageid || i}-${Date.now()}`,
                 name: titleClean,
                 category,
                 title: `${titleClean} — ${subtitle}`,
-                summary: extractText.length > 280 ? extractText.slice(0, 277) + '...' : extractText,
-                detail: `${extractText}\n\nLocated near ${titleClean} (${sample.distKm} km along ${originName} to ${destName}). Coordinates: [${poiLatLng[0].toFixed(4)}, ${poiLatLng[1].toFixed(4)}].`,
+                summary: summary.extract,
+                detail: `${summary.extract}\n\nLocated near ${titleClean} (${sample.distKm} km along ${origin} to ${destination}). Coordinates: [${poiLatLng[0].toFixed(4)}, ${poiLatLng[1].toFixed(4)}].`,
                 latLng: poiLatLng,
                 icon,
-                externalUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(titleClean)}`,
+                externalUrl: summary.content_urls?.desktop?.page,
                 distanceFromStartKm: sample.distKm,
               } as POI;
             }
@@ -125,9 +161,9 @@ export async function generatePoisForRouteAsync(route: RouteData): Promise<POI[]
         }
       }
 
-      // 2. OpenStreetMap Nominatim Reverse Geocoding Fallback
+      // 2. Nominatim Reverse Geocoding Fallback if Wikipedia had no article nearby
       const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14`;
-      const nomRes = await fetch(nomUrl);
+      const nomRes = await fetch(nomUrl, { headers });
       if (nomRes.ok) {
         const nomData = await nomRes.json();
         const addr = nomData.address || {};
@@ -139,7 +175,7 @@ export async function generatePoisForRouteAsync(route: RouteData): Promise<POI[]
             name: placeName,
             category: 'hiddenGems',
             title: `${placeName} — Local Waypoint (${sample.distKm} km)`,
-            summary: `Approaching ${placeName} along the route from ${originName} to ${destName}.`,
+            summary: `Approaching ${placeName} along the route from ${origin} to ${destination}.`,
             detail: `Waypoint situated in ${placeName} (${sample.distKm} km mark). Coordinates: [${lat.toFixed(4)}, ${lon.toFixed(4)}].`,
             latLng: sample.coord,
             icon: '📍',
@@ -148,7 +184,7 @@ export async function generatePoisForRouteAsync(route: RouteData): Promise<POI[]
         }
       }
     } catch (err) {
-      console.warn(`Browser POI fetch failed for ${sample.distKm}km:`, err);
+      console.warn(`Server POI fetch failed for ${sample.distKm}km:`, err);
     }
     return null;
   });
@@ -159,8 +195,4 @@ export async function generatePoisForRouteAsync(route: RouteData): Promise<POI[]
   });
 
   return pois;
-}
-
-export function generatePoisForRoute(route: RouteData): POI[] {
-  return route.pois || [];
 }

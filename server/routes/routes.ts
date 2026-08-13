@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db, RouteRow, ensureSchema } from '../db/db.js';
 import { resolveGoogleMapsUrl, parseGoogleMapsUrl } from '../services/urlResolverService.js';
 import { computeRoute } from '../services/googleRoutesService.js';
+import { generatePoisForRouteAsyncServer } from '../services/poiGeneratorService.js';
 
 export const routesRouter = new Hono();
 
@@ -30,7 +31,7 @@ routesRouter.get('/', async (c) => {
   return c.json(routes);
 });
 
-// GET /api/routes/:id - get single route with polyline
+// GET /api/routes/:id - get single route with polyline and real POIs
 routesRouter.get('/:id', async (c) => {
   await ensureSchema();
   const id = c.req.param('id');
@@ -44,16 +45,24 @@ routesRouter.get('/:id', async (c) => {
     return c.json({ error: 'Route not found' }, 404);
   }
 
+  const origin = String(row.origin);
+  const destination = String(row.destination);
+  const polyline: [number, number][] = JSON.parse(String(row.polyline));
+  const distanceKm = Number(row.distance_km);
+
+  // Discover real-world Wikipedia / Nominatim POIs
+  const pois = await generatePoisForRouteAsyncServer(origin, destination, polyline, distanceKm);
+
   return c.json({
     id: String(row.id),
     name: String(row.name),
-    origin: String(row.origin),
-    destination: String(row.destination),
+    origin,
+    destination,
     waypoints: JSON.parse(String(row.waypoints || '[]')),
-    distanceKm: Number(row.distance_km),
+    distanceKm,
     durationMin: Number(row.duration_min),
-    polyline: JSON.parse(String(row.polyline)),
-    pois: [],
+    polyline,
+    pois,
     sourceUrl: row.source_url ? String(row.source_url) : null,
     createdAt: String(row.created_at),
   });
@@ -108,6 +117,14 @@ routesRouter.post('/', async (c) => {
       ],
     });
 
+    // 5. Discover real-world Wikipedia / Nominatim POIs
+    const pois = await generatePoisForRouteAsyncServer(
+      computed.origin,
+      computed.destination,
+      computed.polyline,
+      computed.distanceKm
+    );
+
     return c.json(
       {
         id: routeId,
@@ -118,7 +135,7 @@ routesRouter.post('/', async (c) => {
         distanceKm: computed.distanceKm,
         durationMin: computed.durationMin,
         polyline: computed.polyline,
-        pois: [],
+        pois,
         sourceUrl: url,
         createdAt: new Date().toISOString(),
       },
