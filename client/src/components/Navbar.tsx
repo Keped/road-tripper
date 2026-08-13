@@ -1,12 +1,11 @@
 import React from 'react';
 import { RouteData, TrackingMode } from '../types';
-import { Navigation, Plus, Library, Sliders, Navigation2, Play, Radio } from 'lucide-react';
+import { Navigation, Plus, Library, Sliders, Radio, MapPin } from 'lucide-react';
 
 interface NavbarProps {
-  presetRoutes: RouteData[];
   activeRoute: RouteData;
   trackingMode: TrackingMode;
-  onSelectPresetRoute: (route: RouteData) => void;
+  savedRoutesCount: number;
   onOpenImportModal: () => void;
   onOpenSavedPanel: () => void;
   onOpenSettings: () => void;
@@ -14,18 +13,19 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  presetRoutes,
   activeRoute,
   trackingMode,
-  onSelectPresetRoute,
+  savedRoutesCount,
   onOpenImportModal,
   onOpenSavedPanel,
   onOpenSettings,
   onToggleGPS,
 }) => {
+  const isRouteLoaded = activeRoute.id !== 'no-active-route';
+
   return (
     <header className="h-16 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 flex items-center justify-between text-slate-100 shrink-0 z-30 shadow-lg">
-      {/* Brand & Route Selector */}
+      {/* Brand & Active Route Badge */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-cyan-500/20">
@@ -36,31 +36,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </div>
 
-        {/* Route Dropdown */}
-        <div className="relative">
-          <select
-            value={activeRoute.id}
-            onChange={(e) => {
-              const selected = presetRoutes.find((r) => r.id === e.target.value);
-              if (selected) onSelectPresetRoute(selected);
-            }}
-            className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-slate-100 focus:outline-none focus:border-cyan-500 appearance-none pr-8 cursor-pointer max-w-[180px] sm:max-w-[240px] truncate min-h-[44px]"
-          >
-            <optgroup label="Preset Routes">
-              {presetRoutes.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </optgroup>
-            {!activeRoute.isPreset && (
-              <optgroup label="Active Custom Route">
-                <option value={activeRoute.id}>{activeRoute.name}</option>
-              </optgroup>
+        {/* Active Route Badge */}
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs max-w-[200px] sm:max-w-[280px]">
+          <MapPin className="w-4 h-4 text-cyan-400 shrink-0" />
+          <div className="truncate">
+            <span className="font-bold text-slate-200 block truncate">{activeRoute.name}</span>
+            {isRouteLoaded && (
+              <span className="text-[10px] text-slate-400 block truncate">
+                {activeRoute.origin} → {activeRoute.destination}
+              </span>
             )}
-          </select>
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
-            ▼
           </div>
         </div>
       </div>
@@ -70,21 +55,26 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Import Route button */}
         <button
           onClick={onOpenImportModal}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 transition-colors active:scale-95 min-h-[44px]"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-cyan-500/20 active:scale-95 min-h-[44px]"
           title="Import Google Maps URL"
         >
-          <Plus className="w-4 h-4 text-cyan-400" />
-          <span className="hidden md:inline">Import Link</span>
+          <Plus className="w-4 h-4" />
+          <span className="hidden md:inline">Import Route</span>
         </button>
 
         {/* Saved Routes Library button */}
         <button
           onClick={onOpenSavedPanel}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 transition-colors active:scale-95 min-h-[44px]"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 transition-colors active:scale-95 min-h-[44px] relative"
           title="Saved Routes Library"
         >
           <Library className="w-4 h-4 text-cyan-400" />
           <span className="hidden lg:inline">Saved Library</span>
+          {savedRoutesCount > 0 && (
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-500/30 rounded-full">
+              {savedRoutesCount}
+            </span>
+          )}
         </button>
 
         {/* Real GPS Toggle */}
