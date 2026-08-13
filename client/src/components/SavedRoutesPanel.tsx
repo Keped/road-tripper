@@ -77,7 +77,7 @@ export const SavedRoutesPanel: React.FC<SavedRoutesPanelProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar text-slate-200">
-          {savedRoutes.length === 0 ? (
+          {(!savedRoutes || savedRoutes.length === 0) ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-400 space-y-2">
               <Navigation2 className="w-10 h-10 text-slate-600 mb-1" />
               <div className="font-semibold text-slate-300">No Saved Routes Yet</div>
@@ -86,7 +86,7 @@ export const SavedRoutesPanel: React.FC<SavedRoutesPanelProps> = ({
               </p>
             </div>
           ) : (
-            savedRoutes.map((route) => {
+            (Array.isArray(savedRoutes) ? savedRoutes : []).map((route) => {
               const isActive = activeRouteId === route.id;
               const isEditing = editingId === route.id;
               const isLoading = loadingId === route.id;

@@ -6,7 +6,8 @@ export async function fetchSavedRoutes(): Promise<SavedRouteSummary[]> {
   try {
     const res = await fetch(API_BASE);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
   } catch (err) {
     console.error('Error fetching saved routes:', err);
     return [];
@@ -31,9 +32,15 @@ export async function importRouteFromUrl(url: string, name?: string): Promise<Ro
     body: JSON.stringify({ url, name }),
   });
 
-  const data = await res.json();
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Server error (HTTP ${res.status})`);
+  }
+
   if (!res.ok) {
-    throw new Error(data.error || 'Failed to import route from URL');
+    throw new Error(data?.error || `Failed to import route (HTTP ${res.status})`);
   }
 
   return data;
