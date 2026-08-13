@@ -1,6 +1,6 @@
 import React from 'react';
 import { RouteData, TrackingMode } from '../types';
-import { Navigation, Plus, Library, Sliders, Radio, MapPin } from 'lucide-react';
+import { Navigation, Plus, Library, Sliders, Radio, MapPin, LogOut } from 'lucide-react';
 
 interface NavbarProps {
   activeRoute: RouteData;
@@ -10,6 +10,7 @@ interface NavbarProps {
   onOpenSavedPanel: () => void;
   onOpenSettings: () => void;
   onToggleGPS: () => void;
+  onLogout: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -20,11 +21,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSavedPanel,
   onOpenSettings,
   onToggleGPS,
+  onLogout,
 }) => {
   const isRouteLoaded = activeRoute.id !== 'no-active-route';
 
   return (
-    <header className="h-16 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 flex items-center justify-between text-slate-100 shrink-0 z-30 shadow-lg">
+    <header className="h-16 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 flex items-center justify-between text-slate-100 shrink-0 z-30 shadow-lg select-none">
       {/* Brand & Active Route Badge */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
@@ -98,6 +100,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           title="Open Settings"
         >
           <Sliders className="w-4 h-4 text-slate-300" />
+        </button>
+
+        {/* Logout button */}
+        <button
+          onClick={onLogout}
+          className="p-2.5 rounded-xl bg-slate-900 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-300 transition-colors active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
+          title="Log out of session"
+        >
+          <LogOut className="w-4 h-4" />
         </button>
       </div>
     </header>

@@ -7,6 +7,7 @@ import { speakText } from './services/ttsService';
 import { enableBackgroundPersistence, disableBackgroundPersistence } from './services/backgroundAudioService';
 import { startGPSTracking, stopGPSTracking } from './services/geoService';
 import { fetchSavedRoutes, fetchRouteById } from './services/apiClient';
+import { checkSession, clearAuthToken } from './services/authService';
 
 import { Navbar } from './components/Navbar';
 import { MapView } from './components/MapView';
@@ -16,9 +17,14 @@ import { RouteSimulator } from './components/RouteSimulator';
 import { SettingsPanel } from './components/SettingsPanel';
 import { RouteImportModal } from './components/RouteImportModal';
 import { SavedRoutesPanel } from './components/SavedRoutesPanel';
+import { LoginModal } from './components/LoginModal';
 
 export function App() {
   const { settings, updateSettings } = useSettingsState();
+
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
 
   // Active Route
   const [activeRoute, setActiveRoute] = useState<RouteData>(DEFAULT_EMPTY_ROUTE);
@@ -57,9 +63,31 @@ export function App() {
     }
   }, []);
 
+  // Check auth session on initial load
   useEffect(() => {
-    loadSavedRoutesList();
+    async function verifyAuth() {
+      setIsCheckingAuth(true);
+      const isOk = await checkSession();
+      setIsAuthenticated(isOk);
+      setIsCheckingAuth(false);
+      if (isOk) {
+        loadSavedRoutesList();
+      }
+    }
+    verifyAuth();
   }, [loadSavedRoutesList]);
+
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+    loadSavedRoutesList();
+  };
+
+  const handleLogout = () => {
+    clearAuthToken();
+    setIsAuthenticated(false);
+    setActiveRoute(DEFAULT_EMPTY_ROUTE);
+    setSavedRoutes([]);
+  };
 
   // Reset car position whenever active route changes
   useEffect(() => {
@@ -219,6 +247,17 @@ export function App() {
       ? (simIndex / (activeRoute.polyline.length - 1)) * 100
       : 0;
 
+  if (isCheckingAuth) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen w-screen bg-slate-950 text-slate-100 font-sans">
+        <div className="w-12 h-12 rounded-full border-4 border-cyan-500/30 border-t-cyan-400 animate-spin mb-4" />
+        <div className="text-sm font-semibold tracking-wider uppercase text-slate-400 animate-pulse">
+          Authenticating Security Gateway...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 select-none">
       {/* Top Navbar */}
@@ -230,6 +269,7 @@ export function App() {
         onOpenSavedPanel={() => setIsSavedPanelOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onToggleGPS={toggleGPSMode}
+        onLogout={handleLogout}
       />
 
       {/* Main Cockpit Split Layout */}
@@ -278,6 +318,11 @@ export function App() {
       </main>
 
       {/* Modals & Panels */}
+      <LoginModal
+        isOpen={!isAuthenticated}
+        onLoginSuccess={handleLoginSuccess}
+      />
+
       <RouteImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}

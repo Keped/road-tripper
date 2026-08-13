@@ -4,7 +4,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../app.js';
-import { db, ensureSchema } from '../../db/db.js';
+import { ensureSchema } from '../../db/db.js';
+import { getExpectedToken } from '../../routes/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,11 @@ const fixturePath = path.join(__dirname, '../fixtures/googleRoutesResponse.json'
 describe('Integration Test: Import Route from Google Maps', () => {
   const originalFetch = globalThis.fetch;
   let googleApiCallCount = 0;
+
+  const authHeaders = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${getExpectedToken()}`,
+  };
 
   before(async () => {
     await ensureSchema();
@@ -72,7 +78,7 @@ describe('Integration Test: Import Route from Google Maps', () => {
 
     const response = await app.request('/api/routes', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify(importPayload),
     });
 
@@ -98,7 +104,9 @@ describe('Integration Test: Import Route from Google Maps', () => {
     assert.equal(googleApiCallCount, 1, 'Google API mock should be invoked exactly once via recorded fixture');
 
     // Verify persistence in SQLite database via GET /api/routes/:id
-    const getRes = await app.request(`/api/routes/${data.id}`);
+    const getRes = await app.request(`/api/routes/${data.id}`, {
+      headers: authHeaders,
+    });
     assert.equal(getRes.status, 200, 'GET /api/routes/:id should return 200 OK');
     const savedRoute = await getRes.json();
     assert.equal(savedRoute.id, data.id);
@@ -108,7 +116,7 @@ describe('Integration Test: Import Route from Google Maps', () => {
   it('returns 400 Bad Request for invalid or non-directions Google Maps URLs', async () => {
     const response = await app.request('/api/routes', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ url: 'https://google.com/search?q=chicago' }),
     });
 
@@ -121,7 +129,7 @@ describe('Integration Test: Import Route from Google Maps', () => {
   it('returns 400 Bad Request when URL parameter is missing', async () => {
     const response = await app.request('/api/routes', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ name: 'No URL Route' }),
     });
 
