@@ -1,0 +1,18 @@
+{
+  "routes": [
+    {
+      "distanceMeters": 482803,
+      "duration": "16200s",
+      "polyline": {
+        "geoJsonLinestring": {
+          "type": "LineString",
+          "coordinates": [
+            [-87.6298, 41.8781],
+            [-89.6501, 39.7817],
+            [-90.1994, 38.627]
+          ]
+        }
+      }
+    }
+  ]
+}
