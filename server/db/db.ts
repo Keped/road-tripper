@@ -109,49 +109,58 @@ function initDatabase(): Client {
     }
   }
 
-  // Local / Serverless file storage fallback
-  try {
-    const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-    const dbDir = isVercel ? '/tmp' : path.join(__dirname, '../../db_storage');
+  const isVercel = process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV);
+  if (isVercel) {
+    console.log('⚡ Running on Vercel Serverless without Turso DB credentials. Using in-memory fallback store.');
+    return createInMemoryClient();
+  }
 
-    if (!isVercel && !fs.existsSync(dbDir)) {
+  // Local file storage fallback for local development
+  try {
+    const dbDir = path.join(__dirname, '../../db_storage');
+    if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
     }
 
-    const dbPath = isVercel ? '/tmp/roadpulse.db' : path.join(dbDir, 'roadpulse.db');
+    const dbPath = path.join(dbDir, 'roadpulse.db');
     console.log(`📁 Using local SQLite database at: ${dbPath}`);
 
     return createClient({
       url: `file:${dbPath}`,
     });
   } catch (err) {
-    console.warn('⚠️ Native SQLite driver unavailable in serverless environment. Using in-memory fallback store.');
+    console.warn('⚠️ Native SQLite driver unavailable. Using in-memory fallback store.');
     return createInMemoryClient();
   }
 }
 
 export const db = initDatabase();
 
+let schemaInitialized = false;
+
 // Execute schema creation
 export async function ensureSchema(): Promise<void> {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS routes (
-      id           TEXT PRIMARY KEY,
-      name         TEXT NOT NULL,
-      origin       TEXT NOT NULL,
-      destination  TEXT NOT NULL,
-      waypoints    TEXT NOT NULL DEFAULT '[]',
-      distance_km  REAL NOT NULL,
-      duration_min REAL NOT NULL,
-      polyline     TEXT NOT NULL,
-      source_url   TEXT,
-      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
+  if (schemaInitialized) return;
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS routes (
+        id           TEXT PRIMARY KEY,
+        name         TEXT NOT NULL,
+        origin       TEXT NOT NULL,
+        destination  TEXT NOT NULL,
+        waypoints    TEXT NOT NULL DEFAULT '[]',
+        distance_km  REAL NOT NULL,
+        duration_min REAL NOT NULL,
+        polyline     TEXT NOT NULL,
+        source_url   TEXT,
+        created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    schemaInitialized = true;
+  } catch (err) {
+    console.error('Failed to initialize DB schema:', err);
+  }
 }
-
-// Run schema setup asynchronously
-ensureSchema().catch((err) => console.error('Failed to initialize DB schema:', err));
 
 export interface RouteRow {
   id: string;
