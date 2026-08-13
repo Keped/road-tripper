@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd client && npm run build",
+  "buildCommand": "npm run build --workspace=client",
   "outputDirectory": "client/dist",
   "rewrites": [
     {
