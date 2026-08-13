@@ -53,6 +53,7 @@ routesRouter.get('/:id', async (c) => {
     distanceKm: Number(row.distance_km),
     durationMin: Number(row.duration_min),
     polyline: JSON.parse(String(row.polyline)),
+    pois: [],
     sourceUrl: row.source_url ? String(row.source_url) : null,
     createdAt: String(row.created_at),
   });
@@ -117,6 +118,7 @@ routesRouter.post('/', async (c) => {
         distanceKm: computed.distanceKm,
         durationMin: computed.durationMin,
         polyline: computed.polyline,
+        pois: [],
         sourceUrl: url,
         createdAt: new Date().toISOString(),
       },

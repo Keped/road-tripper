@@ -138,7 +138,7 @@ export const MapView: React.FC<MapViewProps> = ({
         <Marker position={carPosition} icon={createCarIcon(carHeading)} />
 
         {/* POI Markers */}
-        {route.pois.map((poi) => (
+        {(route.pois || []).map((poi) => (
           <Marker
             key={poi.id}
             position={poi.latLng}

@@ -2,6 +2,14 @@ import { RouteData, SavedRouteSummary } from '../types';
 
 const API_BASE = '/api/routes';
 
+function normalizeRouteData(data: any): RouteData {
+  return {
+    ...data,
+    pois: Array.isArray(data?.pois) ? data.pois : [],
+    polyline: Array.isArray(data?.polyline) ? data.polyline : [],
+  };
+}
+
 export async function fetchSavedRoutes(): Promise<SavedRouteSummary[]> {
   try {
     const res = await fetch(API_BASE);
@@ -18,7 +26,8 @@ export async function fetchRouteById(id: string): Promise<RouteData | null> {
   try {
     const res = await fetch(`${API_BASE}/${id}`);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    return normalizeRouteData(data);
   } catch (err) {
     console.error(`Error fetching route ${id}:`, err);
     return null;
@@ -43,7 +52,7 @@ export async function importRouteFromUrl(url: string, name?: string): Promise<Ro
     throw new Error(data?.error || `Failed to import route (HTTP ${res.status})`);
   }
 
-  return data;
+  return normalizeRouteData(data);
 }
 
 export async function updateRouteName(id: string, name: string): Promise<void> {
