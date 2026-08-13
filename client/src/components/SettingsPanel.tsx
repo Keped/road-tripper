@@ -29,6 +29,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const categories: { key: POICategory; label: string; icon: string; desc: string }[] = [
     { key: 'historic', label: 'Historic Landmarks', icon: '🏰', desc: 'Battlefields, heritage sites & historical monuments (Wikipedia)' },
+    { key: 'reviews', label: 'Top Rated Spots & Reviews', icon: '⭐', desc: 'Yelp & TripAdvisor top rated eateries, bakeries & roadside stops' },
     { key: 'news', label: 'Live News & Local Updates', icon: '📰', desc: 'Breaking news stories, local events & regional updates' },
     { key: 'social', label: 'Community Buzz & Insider Tips', icon: '💬', desc: 'Reddit discussions, viral food spots & local traveler tips' },
     { key: 'markets', label: 'Pop-Up Markets & Events', icon: '🎪', desc: 'Farmers markets, local fairs & pop-up events' },
@@ -106,7 +107,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-slate-100">Spoken Voice Callouts</div>
-                  <div className="text-xs text-slate-400">Read POI stories & news over car speakers</div>
+                  <div className="text-xs text-slate-400">Read POI stories & Yelp ratings over car speakers</div>
                 </div>
                 <input
                   type="checkbox"

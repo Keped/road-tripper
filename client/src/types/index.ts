@@ -1,4 +1,4 @@
-export type POICategory = 'historic' | 'markets' | 'hazards' | 'podcasts' | 'hiddenGems' | 'news' | 'social';
+export type POICategory = 'historic' | 'markets' | 'hazards' | 'podcasts' | 'hiddenGems' | 'news' | 'social' | 'reviews';
 
 export interface POI {
   id: string;
@@ -9,10 +9,13 @@ export interface POI {
   detail: string;
   latLng: [number, number]; // [lat, lng]
   icon?: string;
-  externalUrl?: string; // podcast, news article, or social link
+  externalUrl?: string; // article, review, or social link
   audioClipUrl?: string;
   distanceFromStartKm?: number;
-  sourceProvider?: 'Wikipedia' | 'Google News' | 'Reddit' | 'OpenStreetMap' | 'RoadPulse';
+  rating?: number; // e.g. 4.8
+  reviewCount?: number; // e.g. 1240
+  priceTier?: string; // e.g. "$$"
+  sourceProvider?: 'Yelp' | 'TripAdvisor' | 'Foursquare' | 'Google Reviews' | 'Wikipedia' | 'Google News' | 'Reddit' | 'OpenStreetMap' | 'RoadPulse';
 }
 
 export interface RoutePoint {
@@ -62,6 +65,7 @@ export interface NotificationSettings {
   hiddenGems: boolean;
   news: boolean;
   social: boolean;
+  reviews: boolean;
 }
 
 export interface VoiceSettings {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { TriggeredAlert } from '../types';
-import { Volume2, ExternalLink, MapPin, AlertTriangle, Calendar, BookOpen, Clock, Newspaper, MessageSquare } from 'lucide-react';
+import { Volume2, ExternalLink, MapPin, AlertTriangle, Calendar, BookOpen, Clock, Newspaper, MessageSquare, Star } from 'lucide-react';
 import { speakText } from '../services/ttsService';
 import { formatDistance } from '../utils/distance';
 
@@ -14,6 +14,12 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, voiceSpeed = 'norma
 
   const getCategoryConfig = (category: string) => {
     switch (category) {
+      case 'reviews':
+        return {
+          label: 'Top Rated Spot & Review',
+          bg: 'bg-yellow-950/70 border-yellow-500/40 text-yellow-300',
+          icon: <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />,
+        };
       case 'news':
         return {
           label: 'Live News & Updates',
@@ -68,9 +74,9 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, voiceSpeed = 'norma
   });
 
   return (
-    <div className={`p-4 rounded-xl border backdrop-blur-md transition-all duration-300 shadow-lg ${config.bg} hover:border-slate-400/50`}>
+    <div className={`p-4 rounded-xl border backdrop-blur-md transition-all duration-300 shadow-lg ${config.bg} hover:border-slate-400/50 select-none`}>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {config.icon}
           <span className="text-xs font-semibold uppercase tracking-wider">{config.label}</span>
           {poi.sourceProvider && (
@@ -79,7 +85,7 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, voiceSpeed = 'norma
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2 text-xs text-slate-400 shrink-0">
           <span className="flex items-center gap-1 font-mono">
             <Clock className="w-3 h-3" /> {timeStr}
           </span>
@@ -90,6 +96,21 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, voiceSpeed = 'norma
       </div>
 
       <h3 className="text-lg font-bold text-slate-50 leading-tight mb-1">{poi.title}</h3>
+
+      {poi.rating && (
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-xs font-bold font-mono">
+            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+            <span>{poi.rating.toFixed(1)}</span>
+          </div>
+          {poi.reviewCount && (
+            <span className="text-xs text-slate-400">({poi.reviewCount.toLocaleString()} reviews)</span>
+          )}
+          {poi.priceTier && (
+            <span className="text-xs font-bold text-emerald-400 font-mono">{poi.priceTier}</span>
+          )}
+        </div>
+      )}
 
       <p className="text-sm text-slate-200 leading-snug mb-3">{poi.summary}</p>
 
@@ -112,7 +133,7 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, voiceSpeed = 'norma
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/30 transition-colors active:scale-95 min-h-[44px]"
           >
-            <span>Read Article</span>
+            <span>View Reviews</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         )}

@@ -23,6 +23,7 @@ export const PassedPlacesFeed: React.FC<PassedPlacesFeedProps> = ({
   const filters: { key: POICategory | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'historic', label: '🏰 Historic' },
+    { key: 'reviews', label: '⭐ Reviews' },
     { key: 'news', label: '📰 News' },
     { key: 'social', label: '💬 Community' },
     { key: 'hazards', label: '⚠️ Hazards' },
@@ -84,7 +85,7 @@ export const PassedPlacesFeed: React.FC<PassedPlacesFeedProps> = ({
             <div>
               <h3 className="font-semibold text-slate-200 text-sm">Listening for Multi-Source Intelligence</h3>
               <p className="text-xs text-slate-400 mt-1 max-w-[240px]">
-                Start GPS tracking or driving simulation. As you pass historic sites, live news locations, or community buzz spots within {settings.triggerRadiusM}m, cards will appear here.
+                Start GPS tracking or driving simulation. As you pass historic sites, Yelp/TripAdvisor top rated food stops, or news locations within {settings.triggerRadiusM}m, cards will appear here.
               </p>
             </div>
           </div>

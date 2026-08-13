@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     hiddenGems: true,
     news: true,
     social: true,
+    reviews: true,
   },
   voice: {
     enabled: true,
