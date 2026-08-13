@@ -1,11 +1,18 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { routesRouter } from './routes/routes.js';
 
 export const app = new Hono();
 
-// Enable CORS
-app.use('/*', cors());
+// Enable CORS cleanly without relying on Node IncomingMessage headers.get
+app.use('/*', async (c, next) => {
+  c.header('Access-Control-Allow-Origin', '*');
+  c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Goog-Api-Key');
+  if (c.req.method === 'OPTIONS') {
+    return c.text('', 204);
+  }
+  await next();
+});
 
 // Mount API routes
 app.route('/api/routes', routesRouter);
