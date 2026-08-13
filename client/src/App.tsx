@@ -18,6 +18,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { RouteImportModal } from './components/RouteImportModal';
 import { SavedRoutesPanel } from './components/SavedRoutesPanel';
 import { LoginModal } from './components/LoginModal';
+import { RouteOverviewModal } from './components/RouteOverviewModal';
 
 export function App() {
   const { settings, updateSettings } = useSettingsState();
@@ -42,6 +43,8 @@ export function App() {
   // Alerts State
   const [triggeredAlerts, setTriggeredAlerts] = useState<TriggeredAlert[]>([]);
   const seenPoiIdsRef = useRef<Set<string>>(new Set());
+  // Lookahead: track POIs that have already been pre-announced (2-min warning)
+  const preAnnouncedPoiIdsRef = useRef<Set<string>>(new Set());
 
   // Saved Routes Library
   const [savedRoutes, setSavedRoutes] = useState<SavedRouteSummary[]>([]);
@@ -50,6 +53,10 @@ export function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isSavedPanelOpen, setIsSavedPanelOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isItineraryOpen, setIsItineraryOpen] = useState<boolean>(false);
+
+  // Upcoming POI state (for the CockpitHUD "next POI" indicator)
+  const [upcomingPoi, setUpcomingPoi] = useState<{ poi: POI; etaSeconds: number; distMeters: number } | null>(null);
 
   // Fetch saved routes from backend on mount and set active route
   const loadSavedRoutesList = useCallback(async () => {
@@ -100,43 +107,137 @@ export function App() {
       }
       setTriggeredAlerts([]);
       seenPoiIdsRef.current.clear();
+      preAnnouncedPoiIdsRef.current.clear();
+      setUpcomingPoi(null);
     }
   }, [activeRoute]);
 
-  // GEOFENCING LOGIC: Check proximity to POIs on position update
+  /**
+   * Calculate the distance in meters along the polyline from a given polyline index to a POI.
+   * Returns the sum of segment distances from currentIdx to the polyline point nearest to the POI.
+   */
+  const getDistanceAlongPolylineToPoi = useCallback(
+    (currentIdx: number, poi: POI): number | null => {
+      const poly = activeRoute.polyline;
+      if (!poly || poly.length < 2) return null;
+
+      // Find the polyline index closest to this POI
+      let closestIdx = currentIdx;
+      let closestDist = Infinity;
+      for (let i = currentIdx; i < poly.length; i++) {
+        const d = getHaversineDistanceMeters(poly[i], poi.latLng);
+        if (d < closestDist) {
+          closestDist = d;
+          closestIdx = i;
+        }
+      }
+
+      // POI is behind us
+      if (closestIdx <= currentIdx) return null;
+
+      // Sum segment distances from current position to the closest point
+      let totalDist = 0;
+      for (let i = currentIdx; i < closestIdx; i++) {
+        totalDist += getHaversineDistanceMeters(poly[i], poly[i + 1]);
+      }
+      return totalDist;
+    },
+    [activeRoute]
+  );
+
+  // GEOFENCING + LOOKAHEAD LOGIC: Check proximity and 2-minute ETA to POIs on position update
   const checkGeofence = useCallback(
-    (currentPos: [number, number]) => {
+    (currentPos: [number, number], currentSpeedKmh: number, currentPolyIdx: number) => {
       if (!activeRoute.pois || activeRoute.pois.length === 0) return;
+
+      let nearestUpcoming: { poi: POI; etaSeconds: number; distMeters: number } | null = null;
 
       activeRoute.pois.forEach((poi) => {
         // 1. Check if category is enabled in settings
         const categoryEnabled = settings.notifications[poi.category];
         if (!categoryEnabled) return;
 
-        // 2. Check if already triggered in this session
-        if (seenPoiIdsRef.current.has(poi.id)) return;
+        // Direct distance check for immediate triggering
+        const directDist = getHaversineDistanceMeters(currentPos, poi.latLng);
 
-        // 3. Check distance
-        const dist = getHaversineDistanceMeters(currentPos, poi.latLng);
-        if (dist <= settings.triggerRadiusM) {
+        // 2. Immediate geofence trigger (already at the POI)
+        if (directDist <= settings.triggerRadiusM && !seenPoiIdsRef.current.has(poi.id)) {
           seenPoiIdsRef.current.add(poi.id);
+          preAnnouncedPoiIdsRef.current.add(poi.id); // also mark as pre-announced
 
           const alertObj: TriggeredAlert = {
             poi,
             triggeredAtTimestamp: Date.now(),
-            distMeters: dist,
+            distMeters: directDist,
           };
 
           setTriggeredAlerts((prev) => [alertObj, ...prev]);
 
           // Trigger Text-to-Speech voice alert if enabled
           if (settings.voice.enabled) {
-            speakText(`${poi.title}. ${poi.summary}`, settings.voice.speed);
+            speakText(`Arriving now. ${poi.title}. ${poi.summary}`, settings.voice.speed);
+          }
+          return;
+        }
+
+        // 3. Lookahead: 2-minute pre-announcement for live tracking modes
+        if (
+          (trackingMode === 'simulating' || trackingMode === 'gps') &&
+          !seenPoiIdsRef.current.has(poi.id) &&
+          !preAnnouncedPoiIdsRef.current.has(poi.id) &&
+          currentSpeedKmh > 5
+        ) {
+          const alongDist = getDistanceAlongPolylineToPoi(currentPolyIdx, poi);
+          if (alongDist !== null && alongDist > 0) {
+            const speedMs = (currentSpeedKmh * 1000) / 3600;
+            const etaSeconds = alongDist / speedMs;
+
+            // Track nearest upcoming for HUD
+            if (!nearestUpcoming || etaSeconds < nearestUpcoming.etaSeconds) {
+              nearestUpcoming = { poi, etaSeconds, distMeters: alongDist };
+            }
+
+            // Trigger pre-announcement when ETA is ~2 minutes (120s) or less
+            if (etaSeconds <= 120 && etaSeconds > 0) {
+              preAnnouncedPoiIdsRef.current.add(poi.id);
+
+              const alertObj: TriggeredAlert = {
+                poi,
+                triggeredAtTimestamp: Date.now(),
+                distMeters: alongDist,
+              };
+
+              setTriggeredAlerts((prev) => [alertObj, ...prev]);
+
+              // Voice pre-announcement
+              if (settings.voice.enabled) {
+                const minutesAway = Math.max(1, Math.round(etaSeconds / 60));
+                const kmAway = (alongDist / 1000).toFixed(1);
+                speakText(
+                  `Heads up. In about ${minutesAway} minute${minutesAway > 1 ? 's' : ''}, ${kmAway} kilometers ahead: ${poi.title}. ${poi.summary}`,
+                  settings.voice.speed
+                );
+              }
+            }
+          }
+        }
+
+        // Also track nearest upcoming for HUD even if already pre-announced
+        if (!seenPoiIdsRef.current.has(poi.id) && currentSpeedKmh > 5) {
+          const alongDist = getDistanceAlongPolylineToPoi(currentPolyIdx, poi);
+          if (alongDist !== null && alongDist > 0) {
+            const speedMs = (currentSpeedKmh * 1000) / 3600;
+            const etaSeconds = alongDist / speedMs;
+            if (!nearestUpcoming || etaSeconds < nearestUpcoming.etaSeconds) {
+              nearestUpcoming = { poi, etaSeconds, distMeters: alongDist };
+            }
           }
         }
       });
+
+      setUpcomingPoi(nearestUpcoming);
     },
-    [activeRoute, settings]
+    [activeRoute, settings, trackingMode, getDistanceAlongPolylineToPoi]
   );
 
   // SIMULATION ENGINE: Move car along polyline step-by-step
@@ -163,14 +264,15 @@ export function App() {
         // Compute heading & speed
         const distM = getHaversineDistanceMeters(currentPos, nextPos);
         const calcSpeedKmh = Math.round((distM / (intervalMs / 1000)) * 3.6);
-        setCarSpeedKmh(Math.min(130, Math.max(30, calcSpeedKmh * simSpeed)));
+        const effectiveSpeed = Math.min(130, Math.max(30, calcSpeedKmh * simSpeed));
+        setCarSpeedKmh(effectiveSpeed);
 
         const newHeading = getHeadingAngle(currentPos, nextPos);
         setCarHeading(newHeading);
         setCarPosition(nextPos);
 
-        // Geofence check
-        checkGeofence(nextPos);
+        // Geofence + lookahead check with speed and index
+        checkGeofence(nextPos, effectiveSpeed, nextIdx);
 
         return nextIdx;
       });
@@ -196,10 +298,26 @@ export function App() {
           if (location.heading !== null && location.heading !== undefined) {
             setCarHeading(location.heading);
           }
+          let speedKmh = 60; // default estimate
           if (location.speed !== null && location.speed !== undefined) {
-            setCarSpeedKmh(Math.round(location.speed * 3.6));
+            speedKmh = Math.round(location.speed * 3.6);
+            setCarSpeedKmh(speedKmh);
           }
-          checkGeofence(newPos);
+
+          // For GPS mode, find closest polyline index for lookahead calculations
+          let closestIdx = 0;
+          let closestDist = Infinity;
+          if (activeRoute.polyline) {
+            for (let i = 0; i < activeRoute.polyline.length; i++) {
+              const d = getHaversineDistanceMeters(activeRoute.polyline[i], newPos);
+              if (d < closestDist) {
+                closestDist = d;
+                closestIdx = i;
+              }
+            }
+          }
+
+          checkGeofence(newPos, speedKmh, closestIdx);
         },
         (err) => {
           console.error('GPS error:', err);
@@ -230,6 +348,8 @@ export function App() {
     }
     setTriggeredAlerts([]);
     seenPoiIdsRef.current.clear();
+    preAnnouncedPoiIdsRef.current.clear();
+    setUpcomingPoi(null);
   };
 
   const handleSeek = (percent: number) => {
@@ -239,7 +359,7 @@ export function App() {
     setSimIndex(targetIdx);
     const newPos = activeRoute.polyline[targetIdx];
     setCarPosition(newPos);
-    checkGeofence(newPos);
+    checkGeofence(newPos, carSpeedKmh, targetIdx);
   };
 
   const progressPercent =
@@ -269,6 +389,7 @@ export function App() {
         onOpenSavedPanel={() => setIsSavedPanelOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onToggleGPS={toggleGPSMode}
+        onOpenItinerary={() => setIsItineraryOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -290,6 +411,7 @@ export function App() {
             speedKmh={carSpeedKmh}
             trackingMode={trackingMode}
             triggeredCount={triggeredAlerts.length}
+            upcomingPoi={upcomingPoi}
           />
 
           {/* Simulator Floating Controls Bar */}
@@ -346,6 +468,12 @@ export function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={updateSettings}
+      />
+
+      <RouteOverviewModal
+        isOpen={isItineraryOpen}
+        onClose={() => setIsItineraryOpen(false)}
+        route={activeRoute}
       />
     </div>
   );

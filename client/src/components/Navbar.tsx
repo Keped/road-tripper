@@ -1,6 +1,6 @@
 import React from 'react';
 import { RouteData, TrackingMode } from '../types';
-import { Navigation, Plus, Library, Sliders, Radio, MapPin, LogOut } from 'lucide-react';
+import { Navigation, Plus, Library, Sliders, Radio, MapPin, LogOut, ListOrdered } from 'lucide-react';
 
 interface NavbarProps {
   activeRoute: RouteData;
@@ -10,6 +10,7 @@ interface NavbarProps {
   onOpenSavedPanel: () => void;
   onOpenSettings: () => void;
   onToggleGPS: () => void;
+  onOpenItinerary: () => void;
   onLogout: () => void;
 }
 
@@ -21,6 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSavedPanel,
   onOpenSettings,
   onToggleGPS,
+  onOpenItinerary,
   onLogout,
 }) => {
   const isRouteLoaded = activeRoute.id !== 'no-active-route';
@@ -63,6 +65,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Plus className="w-4 h-4" />
           <span className="hidden md:inline">Import Route</span>
         </button>
+
+        {/* View Itinerary button */}
+        {isRouteLoaded && (
+          <button
+            onClick={onOpenItinerary}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 transition-colors active:scale-95 min-h-[44px]"
+            title="View route POI itinerary"
+          >
+            <ListOrdered className="w-4 h-4 text-cyan-400" />
+            <span className="hidden lg:inline">Itinerary</span>
+          </button>
+        )}
 
         {/* Saved Routes Library button */}
         <button
