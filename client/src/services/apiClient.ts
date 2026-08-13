@@ -1,13 +1,20 @@
 import { RouteData, SavedRouteSummary } from '../types';
+import { generatePoisForRoute } from './poiGeneratorService';
 
 const API_BASE = '/api/routes';
 
 function normalizeRouteData(data: any): RouteData {
-  return {
+  const baseRoute: RouteData = {
     ...data,
     pois: Array.isArray(data?.pois) ? data.pois : [],
     polyline: Array.isArray(data?.polyline) ? data.polyline : [],
   };
+
+  if (!baseRoute.pois || baseRoute.pois.length === 0) {
+    baseRoute.pois = generatePoisForRoute(baseRoute);
+  }
+
+  return baseRoute;
 }
 
 export async function fetchSavedRoutes(): Promise<SavedRouteSummary[]> {
