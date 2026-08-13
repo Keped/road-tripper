@@ -43,7 +43,7 @@ async function computeWithGoogleRoutes(params: ParsedRouteParams, apiKey: string
     polylineEncoding: 'GEO_JSON_LINESTRING',
   };
 
-  const response = await fetch('https://routes.googleapis.com/v2:computeRoutes', {
+  const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -86,12 +86,13 @@ describe('Integration Test: Import Route from Google Maps', () => {
     assert.equal(data.origin, 'Chicago,IL');
     assert.equal(data.destination, 'St. Louis,MO');
     assert.deepEqual(data.waypoints, ['Springfield,IL']);
-    assert.equal(data.distanceKm, 482.8, 'Distance should match computed fixture distance');
-    assert.equal(data.durationMin, 270, 'Duration should match computed fixture duration (16200s -> 270m)');
+    assert.equal(data.distanceKm, 480.7, 'Distance should match recorded Google API fixture (480.7 km)');
+    assert.equal(data.durationMin, 280, 'Duration should match recorded Google API fixture (16805s -> 280m)');
 
     // Polyline check: GeoJSON [lng, lat] converted to Leaflet [lat, lng]
     assert.ok(Array.isArray(data.polyline), 'Polyline should be an array');
-    assert.deepEqual(data.polyline[0], [41.8781, -87.6298], 'Polyline point 0 should be [lat, lng]');
+    assert.equal(data.polyline.length > 100, true, 'Real polyline should contain full route coordinate detail');
+    assert.deepEqual(data.polyline[0], [41.8832498, -87.63236200000001], 'Polyline point 0 should match real Google GPS coordinate [lat, lng]');
 
     // Assert that the Google Routes API interceptor was triggered with recorded fixture
     assert.equal(googleApiCallCount, 1, 'Google API mock should be invoked exactly once via recorded fixture');
